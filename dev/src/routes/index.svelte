@@ -8,7 +8,7 @@
   <h1 class="flex items-center">
     Svelte image
     <a href="https://github.com/matyunya/svelte-image" class="pl-8">
-      <img src="/github.png" alt="Github Smelte" width="64" height="64" />
+      <img src="github.png" alt="Github Smelte" width="64" height="64" />
     </a>
   </h1>
 
@@ -42,6 +42,7 @@
     is below certain threshold it will be inlined as base64 &mdash; like the Github logo
     above. (External images will not be optimized.)
   </p>
+  <!-- <Image alt="relative" src="./relative.jpg" /> -->
   <Image alt="fuji" src="fuji.jpg" />
   <Image alt="doggo" src="animals.jpg" />
   <Image alt="painting 1" src="1.jpg" />

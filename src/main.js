@@ -37,6 +37,8 @@ let options = {
 
   publicDir: "./static/",
 
+  sourceDir: "./src/",
+
   placeholder: "trace", // or "blur",
 
   // WebP options [sharp docs](https://sharp.pixelplumbing.com/en/stable/api-output/#webp)
@@ -91,12 +93,10 @@ async function downloadImage(url, folder = ".") {
 }
 
 function getPathsObject(nodeSrc) {
-  const inPath = path.resolve(options.publicDir, nodeSrc);
-  const outDir = path.dirname(
-    path.resolve(options.publicDir, options.outputDir, nodeSrc)
-  );
+  const inPath = nodeSrc;
+  const outDir = path.resolve(options.publicDir, options.outputDir);
   const filename = path.basename(inPath);
-  const outUrl = path.relative(options.publicDir, path.join(outDir, filename));
+  const outUrl = path.join(options.outputDir, filename);
 
   return {
     inPath,
@@ -194,6 +194,10 @@ function willNotProcess(reason) {
 }
 
 function willProcess(nodeSrc) {
+  fs.writeFileSync(
+    path.resolve(options.publicDir, options.outputDir, path.basename(nodeSrc)),
+    fs.readFileSync(nodeSrc)
+  );
   return {
     willNotProcess: false,
     reason: undefined,
@@ -201,7 +205,7 @@ function willProcess(nodeSrc) {
   };
 }
 
-async function getProcessingPathsForNode(node) {
+async function getProcessingPathsForNode(node, parentDir) {
   const [value] = getSrc(node);
 
   // dynamic or empty value
@@ -245,7 +249,7 @@ async function getProcessingPathsForNode(node) {
     } else {
       removedDomainSlash = await downloadImage(
         value.data,
-        options.publicDir
+        options.sourceDir
       ).catch((e) => {
         console.error(e.toString());
 
@@ -260,13 +264,18 @@ async function getProcessingPathsForNode(node) {
     removedDomainSlash = value.data.replace(/^\/([^\/])/, "$1");
   }
 
-  const fullPath = path.resolve(options.publicDir, removedDomainSlash);
+  const relativeToParent = path.resolve(parentDir, value.data);
+  const relativeToSource = path.resolve(options.sourceDir, value.data);
 
-  if (fs.existsSync(fullPath)) {
-    return willProcess(removedDomainSlash);
-  } else {
-    return willNotProcess(`The image file does not exist: ${fullPath}`);
+  if (fs.existsSync(relativeToParent)) {
+    return willProcess(relativeToParent);
   }
+
+  if (fs.existsSync(relativeToSource)) {
+    return willProcess(relativeToSource);
+  }
+
+  return willNotProcess(`The image file does not exist: ${relativeToSource}`);
 }
 
 function getBasename(p) {
@@ -274,7 +283,7 @@ function getBasename(p) {
 }
 
 function getRelativePath(p) {
-  return path.relative(options.publicDir, p);
+  return path.relative(options.sourceDir, p);
 }
 
 function getFilenameWithSize(p, size) {
@@ -286,7 +295,7 @@ function getWebpFilenameWithSize(p, size) {
 }
 
 function ensureOutDirExists(outDir) {
-  mkdirp(path.join(options.publicDir, getRelativePath(outDir)));
+  mkdirp(path.join(options.sourceDir, getRelativePath(outDir)));
 }
 
 function insert(content, value, start, end, offset) {
@@ -387,11 +396,12 @@ function getSrcset(sizes, lineFn = srcsetLine, tag = "srcset") {
   return ` ${tag}=\'${srcSetValue}\' `;
 }
 
-async function replaceInComponent(edited, node) {
+async function replaceInComponent(edited, node, parentDir) {
   const { content, offset } = await edited;
 
   const { paths, willNotProcess, reason } = await getProcessingPathsForNode(
-    node
+    node,
+    parentDir
   );
 
   if (willNotProcess) {
@@ -453,10 +463,13 @@ async function optimize(paths) {
   return paths.outUrl;
 }
 
-async function replaceInImg(edited, node) {
+async function replaceInImg(edited, node, parentDir) {
   const { content, offset } = await edited;
 
-  const { paths, willNotProcess } = await getProcessingPathsForNode(node);
+  const { paths, willNotProcess } = await getProcessingPathsForNode(
+    node,
+    parentDir
+  );
   if (willNotProcess) {
     return { content, offset };
   }
@@ -472,11 +485,16 @@ async function replaceInImg(edited, node) {
   }
 }
 
-async function replaceImages(content) {
+async function replaceImages(content, parentDir) {
   let ast;
   const imageNodes = [];
+  const sourceDir = path.resolve(options.sourceDir);
 
-  if (!content.includes("<img") && !content.includes("<Image")) return content;
+  if (
+    !new RegExp(`${sourceDir}[^node_modules]*`).test(parentDir) ||
+    (!content.includes("<img") && !content.includes("<Image"))
+  )
+    return content;
 
   try {
     ast = svelte.parse(content);
@@ -508,9 +526,9 @@ async function replaceImages(content) {
   };
   const processed = await imageNodes.reduce(async (edited, node) => {
     if (node.name === "img") {
-      return replaceInImg(edited, node);
+      return replaceInImg(edited, node, parentDir);
     }
-    return replaceInComponent(edited, node);
+    return replaceInComponent(edited, node, parentDir);
   }, beforeProcessed);
 
   return processed.content;
@@ -526,8 +544,11 @@ function getPreprocessor(opts = {}) {
   };
 
   return {
-    markup: async ({ content }) => ({
-      code: await replaceImages(content),
+    markup: async ({ content, filename }) => ({
+      code: await replaceImages(
+        content,
+        path.dirname(filename ? filename : "")
+      ),
     }),
   };
 }

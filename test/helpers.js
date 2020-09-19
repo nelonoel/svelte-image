@@ -36,7 +36,7 @@ function populateFiles(lookup = {}) {
   if (!fs.existsSync(targetFolder)) fs.mkdirSync(targetFolder);
 
   Object.keys(lookup).forEach(newPath => {
-    const buffer = fs.readFileSync(path.join("./dev/static", lookup[newPath]));
+    const buffer = fs.readFileSync(path.join("./dev/src", lookup[newPath]));
     const newFileLocation = path.join(targetFolder, newPath);
     const newFileDir = path.dirname(newFileLocation);
     fs.mkdirSync(newFileDir, {

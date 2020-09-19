@@ -18,7 +18,7 @@ describe("the main export", () => {
     const { markup } = getPreprocessor();
     const content = `<p>It works.</p>`;
 
-    const { code } = await markup({ content: content });
+    const { code } = await markup({ content });
     expect(code).toEqual(`<p>It works.</p>`);
   });
 });

@@ -119,10 +119,14 @@ const defaults = {
   // array of screen size breakpoints at which sizes above will be applied
   breakpoints: [375, 768, 1024],
 
-  outputDir: "g/",
+  // source directory that contain the original images
+  sourceDir: "./src/",
 
   // should be ./static for Sapper and ./public for plain Svelte projects
   publicDir: "./static/",
+
+  // a directory within publicDir that will contain the processed images
+  outputDir: "g/",
 
   placeholder: "trace", // or "blur",
 
